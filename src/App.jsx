@@ -1,121 +1,154 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import { RESTAURANT, CATEGORIES, MENU_ITEMS, formatPrice } from './data'
 
-function App() {
-  const [count, setCount] = useState(0)
-
+function MenuItem({ item, onClick }) {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <div className="menu-item" onClick={() => onClick(item)}>
+      <div className="menu-item-content">
+        <div className="menu-item-title">{item.name}</div>
+        {item.description && (
+          <p className="menu-item-description">{item.description}</p>
+        )}
+        <span className="menu-item-price">€{formatPrice(item.price)}</span>
+      </div>
+    </div>
   )
 }
 
-export default App
+function ItemModal({ item, onClose }) {
+  if (!item) return null
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-body">
+          <div className="modal-header">
+            <h2>{item.name}</h2>
+            <span className="modal-price">€{formatPrice(item.price)}</span>
+          </div>
+          {item.description && (
+            <p className="modal-description">{item.description}</p>
+          )}
+          <button onClick={onClose} className="modal-close-btn">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CategorySection({ category, items, onItemClick }) {
+  return (
+    <div className="category-section">
+      <h3 className="category-title">{category.name}</h3>
+      {items.map((item) => (
+        <MenuItem key={item.id} item={item} onClick={onItemClick} />
+      ))}
+    </div>
+  )
+}
+
+export default function App() {
+  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0].id)
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const categoryRefs = useRef({})
+
+  const filteredItems = searchQuery.trim()
+    ? MENU_ITEMS.filter((item) =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : MENU_ITEMS
+
+  const scrollToCategory = (catId) => {
+    setActiveCategory(catId)
+    categoryRefs.current[catId]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            setActiveCategory(entry.target.dataset.category)
+          }
+        })
+      },
+      { threshold: 0.5, rootMargin: '-100px 0px -50% 0px' }
+    )
+
+    Object.values(categoryRefs.current).forEach(el => {
+      if (el) observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div className="app">
+      <header className="header">
+        <h1>{RESTAURANT.name}</h1>
+        <p>{RESTAURANT.tagline}</p>
+      </header>
+
+      <nav className="category-nav">
+        {CATEGORIES.map(cat => (
+          <button
+            key={cat.id}
+            className={`nav-btn ${activeCategory === cat.id ? 'active' : ''}`}
+            onClick={() => scrollToCategory(cat.id)}
+          >
+            {cat.name}
+          </button>
+        ))}
+      </nav>
+
+      <div className="search-container">
+        <input
+          type="text"
+          placeholder="Buscar en el menú..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="search-input"
+        />
+      </div>
+
+      <main className="main-content">
+        {searchQuery.trim() ? (
+          <div className="category-section">
+            <h3 className="category-title">Resultados</h3>
+            {filteredItems.map((item) => (
+              <MenuItem key={item.id} item={item} onClick={setSelectedItem} />
+            ))}
+          </div>
+        ) : (
+          CATEGORIES.map(category => {
+            const categoryItems = MENU_ITEMS.filter(i => i.category === category.id)
+            return (
+              <div
+                key={category.id}
+                ref={el => categoryRefs.current[category.id] = el}
+                data-category={category.id}
+              >
+                <CategorySection
+                  category={category}
+                  items={categoryItems}
+                  onItemClick={setSelectedItem}
+                />
+              </div>
+            )
+          })
+        )}
+
+        <div className="restaurant-info">
+          <p><strong>Dirección:</strong> {RESTAURANT.address}</p>
+          <p><strong>Horario:</strong> {RESTAURANT.hours}</p>
+          <p><strong>Rango de precios:</strong> {RESTAURANT.priceRange}</p>
+        </div>
+      </main>
+
+      <ItemModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+    </div>
+  )
+}
